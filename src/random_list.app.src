@@ -1,0 +1,10 @@
+{application, random_list, [
+  {description, "List of elements with random access"},
+  {vsn, "0.1"},
+  {registered, []},
+  {applications, [
+    kernel,
+    stdlib
+  ]},
+  {env, []}
+]}.
