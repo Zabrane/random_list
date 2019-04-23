@@ -24,7 +24,8 @@ all() -> [
   test_0,
   test_1,
   test_2,
-  test_3
+  test_3,
+  test_4
 ].
 
 test_0(_) ->
@@ -68,3 +69,16 @@ test_3(_) ->
   Res = random_list:get(R),
   ?assertEqual(true, lists:member(Res, List)),
   ok.
+
+test_4(_) ->
+  Iterations = 100,
+  List = [ 1,2,3,4,5,6,7,8,9 ],
+  R = random_list:new(List),
+  R0 = lists:foldl(fun(_I, Acc) ->
+    { ok, _, NewAcc} = random_list:pop_push(Acc),
+    NewAcc
+  end, R, lists:seq(1, Iterations)),
+  ?assertEqual(lists:sort(List), lists:sort(random_list:to_list(R0))),
+  ?assertEqual(lists:sort(random_list:to_list(R)), lists:sort(random_list:to_list(R0))),
+  ok.
+

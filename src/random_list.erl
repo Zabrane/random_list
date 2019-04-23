@@ -85,9 +85,9 @@ get(List) ->
   Position = rand:uniform(size(List)),
   get(Position, List).
 
-to_list(List = #random_list{ size = 0 }) -> [];
-to_list(List = #random_list{ items = List }) when is_list(List) -> List;
-to_list(List = #random_list{ items = #rl_pair{ left = Left, right = Right } }) ->
+to_list(#random_list{ size = 0 }) -> [];
+to_list(#random_list{ items = List }) when is_list(List) -> List;
+to_list(#random_list{ items = #rl_pair{ left = Left, right = Right } }) ->
   SizeLeft = size(Left),
   SizeRight = size(Right),
   if
