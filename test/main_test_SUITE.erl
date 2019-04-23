@@ -21,10 +21,11 @@ end_per_testcase(_TestCaseName, _Config) ->
   _Config.
 
 all() -> [
-  main_test_1
+  test_1,
+  test_2
 ].
 
-main_test_1(_Config) ->
+test_1(_Config) ->
   List = [ 1,2,3 ],
   R = random_list:new(List),
   { ok, A, R0 } = random_list:pop(R),
@@ -34,4 +35,13 @@ main_test_1(_Config) ->
   { ok, C, R2 } = random_list:pop(R1),
   ?assertEqual(true, lists:member(C, List -- [ A, B ]) ),
   ?assertEqual(true, random_list:is_empty(R2)),
+  ok.
+
+test_2(_Config) ->
+  List = [ 1,2,3 ],
+  R = random_list:new(List),
+  Res0 = random_list:fold(fun(Item, Acc) -> [ Item | Acc ] end, [], R),
+  ?assertEqual([], Res0 -- List),
+  Res1 = random_list:map(fun(Item) -> Item end, R),
+  ?assertEqual([], Res1 -- List),
   ok.

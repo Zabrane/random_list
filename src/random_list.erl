@@ -8,7 +8,8 @@
   size/1, is_empty/1,
   push/2,
   pop/1,
-  to_list/1
+  to_list/1,
+  fold/3, map/2, foreach/2, shuffle/1
 ]).
 
 -record(rl_pair, {
@@ -81,6 +82,29 @@ to_list(List = #random_list{ items = #rl_pair{ left = Left, right = Right } }) -
     SizeLeft =< SizeRight -> to_list(Left) ++ to_list(Right);
     true -> to_list(Right) ++ to_list(Left)
   end.
+
+map(Fun, List) ->
+  lists:reverse(fold(fun(Item, Map) ->
+    El = Fun(Item),
+    [ El | Map ]
+  end, [], List)).
+
+fold(Fun, Acc, List) ->
+  case is_empty(List) of
+    true -> Acc;
+    false ->
+      { ok, Item, NewList} = pop(List),
+      fold(Fun, Fun(Item, Acc), NewList)
+  end.
+
+foreach(Fun, List) ->
+  fold(fun(Item, _) ->
+    Fun(Item),
+    ok
+  end, ok, List).
+
+shuffle(List) ->
+  fold(fun(Item, Acc) -> [ Item | Acc ] end, [], List).
 
 %% Internal
 
