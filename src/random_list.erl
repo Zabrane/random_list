@@ -7,7 +7,7 @@
   new/0, new/1, new/2,
   size/1, is_empty/1,
   push/2,
-  pop/1, get/1,
+  pop/1, get/1, pop_push/1,
   to_list/1,
   fold/3, map/2, foreach/2, shuffle/1
 ]).
@@ -74,6 +74,12 @@ pop(#random_list{ size = 1, items = [Item]}) ->
 pop(List) ->
   Position = rand:uniform(size(List)),
   pop(Position, List).
+
+pop_push(List) ->
+  case pop(List) of
+    { ok, Item, NewList } -> { ok, Item, push(NewList, Item) };
+    Any -> Any
+  end.
 
 get(List) ->
   Position = rand:uniform(size(List)),
