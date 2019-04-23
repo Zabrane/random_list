@@ -1,16 +1,18 @@
 -module(random_list).
 
--compile({no_auto_import, [ size/1 ]}).
+-compile({no_auto_import, [ size/1, get/1 ]}).
 
 %% API
 -export([
   new/0, new/1, new/2,
   size/1, is_empty/1,
   push/2,
-  pop/1,
+  pop/1, get/1,
   to_list/1,
   fold/3, map/2, foreach/2, shuffle/1
 ]).
+
+-define(MINIMAL_LIST, 5). %% Not separated minimal list
 
 -record(rl_pair, {
   left,
@@ -71,7 +73,11 @@ pop(#random_list{ size = 1, items = [Item]}) ->
 
 pop(List) ->
   Position = rand:uniform(size(List)),
-  pop_by_position(Position, List).
+  pop(Position, List).
+
+get(List) ->
+  Position = rand:uniform(size(List)),
+  get(Position, List).
 
 to_list(List = #random_list{ size = 0 }) -> [];
 to_list(List = #random_list{ items = List }) when is_list(List) -> List;
@@ -82,6 +88,8 @@ to_list(List = #random_list{ items = #rl_pair{ left = Left, right = Right } }) -
     SizeLeft =< SizeRight -> to_list(Left) ++ to_list(Right);
     true -> to_list(Right) ++ to_list(Left)
   end.
+
+%% High order functions
 
 map(Fun, List) ->
   lists:reverse(fold(fun(Item, Map) ->
@@ -108,9 +116,9 @@ shuffle(List) ->
 
 %% Internal
 
-pop_by_position(_, #random_list{ size = 0 }) -> { error, list_is_empty };
-pop_by_position(Position, #random_list{ size = Size }) when Position > Size -> { error, bad_position };
-pop_by_position(Position, List) ->
+pop(_, #random_list{ size = 0 }) -> { error, list_is_empty };
+pop(Position, #random_list{ size = Size }) when Position > Size -> { error, bad_position };
+pop(Position, List) ->
   #random_list{
     size = Size,
     items = Items
@@ -120,6 +128,19 @@ pop_by_position(Position, List) ->
     size = NewSize,
     items = NewItems
   }}.
+
+get(Number, #random_list{ items = List }) when is_list(List) ->
+  lists:nth(Number, List);
+get(Number, #random_list{ items = #rl_pair{ left = Left, right = Right } }) ->
+  Delta = size(Left) - Number,
+  case Delta >= 0 of
+    true -> get(Delta, Left);
+    false -> get(-Delta, Right)
+  end.
+
+extract(Position, Size, List) when is_list(List), Size < ?MINIMAL_LIST ->
+  El = lists:nth(Position, List),
+  { El, Size - 1, List -- [El]};
 
 extract(Position, Size, List) when is_list(List) ->
   { Item, NewList } = extract(Position, List, Size, [], 0),

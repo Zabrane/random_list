@@ -21,9 +21,25 @@ end_per_testcase(_TestCaseName, _Config) ->
   _Config.
 
 all() -> [
+  test_0,
   test_1,
-  test_2
+  test_2,
+  test_3
 ].
+
+test_0(_) ->
+  N = 100000,
+  Count = lists:seq(1,N),
+  List = lists:map(fun(_Index) -> rand:uniform(N) end, Count),
+  R = random_list:new(List),
+  { U, _ } = lists:foldl(fun(_Index, { Acc, R0 }) ->
+    { ok, El, R1 } = random_list:pop(R0),
+    { [ El | Acc ], R1 }
+  end, { [], R }, Count),
+  ?assertEqual([], List -- U),
+  ?assertEqual([], U -- List),
+  ok.
+
 
 test_1(_Config) ->
   List = [ 1,2,3 ],
@@ -44,4 +60,11 @@ test_2(_Config) ->
   ?assertEqual([], Res0 -- List),
   Res1 = random_list:map(fun(Item) -> Item end, R),
   ?assertEqual([], Res1 -- List),
+  ok.
+
+test_3(_) ->
+  List = [ 1,2,3 ],
+  R = random_list:new(List),
+  Res = random_list:get(R),
+  ?assertEqual(true, lists:member(Res, List)),
   ok.
