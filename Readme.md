@@ -1,6 +1,6 @@
 # Random access list
 
-This library is implementing list to access element randomly.
+This library is implementing list (set) to access element randomly.
 It can collect many thousands elements and it have good performance to extract element randomly.
 
 # Usage
