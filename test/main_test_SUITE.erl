@@ -25,7 +25,8 @@ all() -> [
   test_1,
   test_2,
   test_3,
-  test_4
+  test_4,
+  test_5
 ].
 
 test_0(_) ->
@@ -59,7 +60,7 @@ test_2(_Config) ->
   R = random_list:new(List),
   Res0 = random_list:fold(fun(Item, Acc) -> [ Item | Acc ] end, [], R),
   ?assertEqual([], Res0 -- List),
-  Res1 = random_list:map(fun(Item) -> Item end, R),
+  Res1 = random_list:to_list(random_list:map(fun(Item) -> Item end, R)),
   ?assertEqual([], Res1 -- List),
   ok.
 
@@ -82,3 +83,12 @@ test_4(_) ->
   ?assertEqual(lists:sort(random_list:to_list(R)), lists:sort(random_list:to_list(R0))),
   ok.
 
+test_5(_) ->
+  List = [ 1,2,3,4,5,6,7,8,9 ],
+  Rule = fun(A) -> A rem 2 =:= 0 end,
+  L0 = lists:filter(Rule, List),
+  { ok, _, R } = random_list:pop_push(random_list:new(List)),
+  L1 = random_list:to_list(random_list:filter(Rule, R)),
+  ?assertEqual([], L0 -- L1),
+  ?assertEqual([], L1 -- L0),
+  ok.

@@ -9,7 +9,8 @@
   push/2,
   pop/1, get/1, pop_push/1,
   to_list/1,
-  fold/3, map/2, foreach/2, shuffle/1
+  fold/3, foreach/2, shuffle/1,
+  map/2, filter/2
 ]).
 
 -define(MINIMAL_LIST, 5). %% Not separated minimal list
@@ -97,11 +98,56 @@ to_list(#random_list{ items = #rl_pair{ left = Left, right = Right } }) ->
 
 %% High order functions
 
-map(Fun, List) ->
-  lists:reverse(fold(fun(Item, Map) ->
-    El = Fun(Item),
-    [ El | Map ]
-  end, [], List)).
+map(Fun, RandomList = #random_list{ items = List }) when is_list(List) ->
+  NewItems = lists:map(Fun, List),
+  RandomList#random_list{
+    items = NewItems
+  };
+
+map(Fun, RandomList = #random_list{ items = #rl_pair{ left = Left, right = Right } }) ->
+  RandomList#random_list{
+    items = #rl_pair{
+      left = map(Fun, Left),
+      right = map(Fun, Right)
+    }
+  }.
+
+filter(Fun, RandomList = #random_list{ items = List }) when is_list(List) ->
+  NewItems = lists:filter(Fun, List),
+  RandomList#random_list{
+    size = length(NewItems),
+    items = NewItems
+  };
+
+filter(Fun, RandomList = #random_list{ items = #rl_pair{ left = Left, right = Right } }) ->
+  NewLeft = filter(Fun, Left),
+  NewRight = filter(Fun, Right),
+  case { size(NewLeft), size(NewRight) } of
+    { 0,0  } -> new(0, []);
+    { 0, _ } -> NewRight;
+    { _, 0 } -> NewLeft;
+    { A, B } when A+B =< ?MINIMAL_LIST ->
+      RandomList#random_list{
+        size = A + B,
+        items = to_list(NewLeft) ++ to_list(NewRight)
+      };
+    { A, B } when B > A ->
+      RandomList#random_list{
+        size = A + B,
+        items = #rl_pair{
+          left = NewRight,
+          right = NewLeft
+        }
+      };
+    { A, B } when A >= B ->
+      RandomList#random_list{
+        size = A + B,
+        items = #rl_pair{
+          left = NewLeft,
+          right = NewRight
+        }
+      }
+  end.
 
 fold(Fun, Acc, List) ->
   case is_empty(List) of
