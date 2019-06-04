@@ -76,6 +76,7 @@ push(List = #random_list{ items = #rl_pair{ left = Left, right = Right } = Items
     items = NewItems
   }.
 
+pop(#random_list{ size = 0 }) -> { error, list_is_empty };
 pop(#random_list{ size = 1, items = [Item]}) ->
   { ok, Item, new() };
 
@@ -89,6 +90,7 @@ pop_push(List) ->
     Any -> Any
   end.
 
+get(#random_list{ size = 0 }) -> {error, list_is_empty };
 get(List) ->
   Position = rand:uniform(size(List)),
   get(Position, List).
@@ -175,7 +177,6 @@ shuffle(List) ->
 
 %% Internal
 
-pop(_, #random_list{ size = 0 }) -> { error, list_is_empty };
 pop(Position, #random_list{ size = Size }) when Position > Size -> { error, bad_position };
 pop(Position, List) ->
   #random_list{
@@ -188,6 +189,7 @@ pop(Position, List) ->
     items = NewItems
   }}.
 
+get(_, #random_list{ size = 0 }) -> {error, list_is_empty };
 get(Number, #random_list{ items = List }) when is_list(List) ->
   lists:nth(Number, List);
 get(Number, #random_list{ items = #rl_pair{ left = Left, right = Right } }) ->
@@ -312,6 +314,12 @@ t5_test() ->
   L1 = random_list:to_list(random_list:filter(Rule, R)),
   ?assertEqual([], L0 -- L1),
   ?assertEqual([], L1 -- L0),
+  ok.
+
+t6_test() ->
+  EmptyList = random_list:new(),
+  ?assertEqual({ error, list_is_empty }, random_list:pop(EmptyList)),
+  ?assertEqual({ error, list_is_empty }, random_list:get(EmptyList)),
   ok.
 
 -endif.

@@ -110,6 +110,9 @@ push(List = #random_list_weight{ items = #rl_pair{ left = Left, right = Right } 
     is_balanced = false
   }.
 
+
+
+pop(#random_list_weight{ size = 0 }) -> {error, list_is_empty};
 pop(#random_list_weight{ size = 1, items = [#item{ weight = Weight, element = Element} ]}) ->
   { ok, Weight, Element, new() };
 
@@ -123,6 +126,7 @@ pop_push(List) ->
     Any -> Any
   end.
 
+get(#random_list_weight{ size = 0}) -> { error, list_is_empty };
 get(List) ->
   Weight = rand:uniform(sum_weight(List)),
   get(Weight, List).
@@ -173,7 +177,7 @@ merge(R1 = #random_list_weight{ items = #rl_pair{ left = Left1, right = Right1 }
     is_balanced = false
   };
 
-merge(R1 = #random_list_weight{ items = #rl_pair{ left = Left1, right = Right1 } }, R2 = #random_list_weight{ items = List2 }) ->
+merge(R1 = #random_list_weight{ items = #rl_pair{ left = Left1, right = Right1 } }, R2 = #random_list_weight{ items = _List2 }) ->
   D = sum_weight(R2),
   NewItems = case sum_weight(Left1) + D =< sum_weight(Right1) of
     true ->
@@ -200,22 +204,22 @@ merge(R1 = #random_list_weight{ items = List1 }, R2 = #random_list_weight{ items
 
 %% High order functions
 
-map(Fun, RandomList = #random_list_weight{ items = List }) when is_list(List) ->
+map(Fun, #random_list_weight{ items = List }) when is_list(List) ->
   NewItems = lists:map(fun(#item{ weight = Weight, element = El}) ->
     Fun({Weight, El})
   end, List),
   new(NewItems);
 
-map(Fun, RandomList = #random_list_weight{ items = #rl_pair{ left = Left, right = Right } }) ->
+map(Fun, #random_list_weight{ items = #rl_pair{ left = Left, right = Right } }) ->
   new(map(Fun, Left) ++ map(Fun, Right)).
 
-filter(Fun, RandomList = #random_list_weight{ items = List }) when is_list(List) ->
+filter(Fun, #random_list_weight{ items = List }) when is_list(List) ->
   NewItems = lists:filter(fun(#item{ weight = Weight, element = El }) ->
     Fun({Weight, El})
   end, List),
   new(NewItems);
 
-filter(Fun, RandomList = #random_list_weight{ items = #rl_pair{ left = Left, right = Right } }) ->
+filter(Fun, #random_list_weight{ items = #rl_pair{ left = Left, right = Right } }) ->
   NewLeft = filter(Fun, Left),
   NewRight = filter(Fun, Right),
   new(NewLeft ++ NewRight).
@@ -239,10 +243,6 @@ foreach(Fun, List) ->
 pop(_, #random_list_weight{ size = 0 }) -> { error, list_is_empty };
 pop(Weight, #random_list_weight{ sum_weight = SumWeight}) when Weight > SumWeight -> { error, bad_weight };
 pop(Weight, List) ->
-  #random_list_weight{
-    size = Size,
-    items = Items
-  } = List,
   { ok, Item, NewR} = extract(Weight, List, new()),
   { ok, Item#item.weight, Item#item.element, NewR }.
 
@@ -257,7 +257,7 @@ get(WeightPos, R = #random_list_weight{ items = List }) when is_list(List) ->
         items = Tail
       },
       get(WeightPos - Weight, NewList);
-    [#item{ weight = Weight, element = Element } | Tail ] ->
+    [#item{ weight = Weight, element = Element } | _ ] ->
       { ok, Weight, Element }
   end;
 
@@ -268,7 +268,7 @@ get(WeightPos, #random_list_weight{ items = #rl_pair{ left = Left, right = Right
     false -> get(-Delta, Right)
   end.
 
-extract(WeightPos, R = #random_list_weight{ size = Size, items = [ Item = #item{ weight = Weight, element = El } | Tail ]}, Acc)  ->
+extract(WeightPos, R = #random_list_weight{ items = [ Item = #item{ weight = Weight, element = El } | Tail ]}, Acc)  ->
   case WeightPos =< Weight of
     true ->
       NewR = #random_list_weight{
@@ -286,7 +286,7 @@ extract(WeightPos, R = #random_list_weight{ size = Size, items = [ Item = #item{
       extract(WeightPos - Weight, NewR, push(Acc, Weight, El))
   end;
 
-extract(WeightPos, R = #random_list_weight{ size = Size, items = #rl_pair{ left = Left, right = Right}}, Acc) ->
+extract(WeightPos, #random_list_weight{ items = #rl_pair{ left = Left, right = Right}}, Acc) ->
   case WeightPos =< sum_weight(Left) of
     true ->
       extract(WeightPos, Left, merge(Right, Acc));
@@ -325,7 +325,7 @@ t0_test() ->
   ?assertEqual(true, lists:member(B, List -- [ A ]) ),
   { ok, 1, C, R2 } = random_list_weight:pop(R1),
   ?assertEqual(true, lists:member(C, List -- [ A, B ]) ),
-  %?assertEqual(true, random_list_weight:is_empty(R2)),
+  ?assertEqual(97, random_list_weight:size(R2)),
   ok.
 
 t1_test() ->
@@ -335,10 +335,16 @@ t1_test() ->
       { ok, _, 1 } -> {A+1, B};
       { ok, _, 2 } -> {A, B + 1 }
     end
-  end, {0,0}, lists:seq(1, 1000)),
+  end, {0,0}, lists:seq(1, 10000)),
   P = A0/(A0+B0),
-  ?assert( P >= 0.08 ),
+  ?assert( P >= 0.07 ),
   ?assert( P < 0.12 ),
+  ok.
+
+t2_test() ->
+  EmptyList = random_list_weight:new(),
+  ?assertEqual({ error, list_is_empty }, random_list_weight:pop(EmptyList)),
+  ?assertEqual({ error, list_is_empty }, random_list_weight:get(EmptyList)),
   ok.
 
 -endif.
