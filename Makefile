@@ -25,7 +25,7 @@ run:
 .PHONY: test
 test:
 	rm -rf test/ct_logs
-#	$(REBAR) eunit 
+	$(REBAR) eunit 
 	$(REBAR) ct
 
 
