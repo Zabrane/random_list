@@ -12,7 +12,7 @@
   balance/1,
   to_list/1,
   fold/3, foreach/2,
-  map/2, filter/2
+  map/2, filter/2, partition/2
 ]).
 
 -define(MINIMAL_LIST, 5). %% Not separated minimal list
@@ -45,7 +45,9 @@ new() -> #random_list_weight{}.
 new(List) ->
   { Items, SumWeight } = lists:mapfoldl(fun
     ({Weight, Element}, Sum) ->
-      { #item{ weight = Weight, element = Element }, Sum + Weight}
+      { #item{ weight = Weight, element = Element }, Sum + Weight};
+    (#item{ weight = Weight, element = _Element} = Item, Sum) ->
+      { Item, Sum + Weight }
   end, 0, List),
 
   balance(#random_list_weight{
@@ -151,10 +153,8 @@ merge(R1 = #random_list_weight{ items = List1, size = Size1 }, R2 = #random_list
 
 merge(R1 = #random_list_weight{ items = List1 }, R2 = #random_list_weight{ items = List2 }) when is_list(List1), is_list(List2) ->
   Items = case sum_weight(R1) > sum_weight(R2) of
-    true ->
-      #rl_pair{ left = R1, right = R2 };
-    false ->
-      #rl_pair{ left = R2, right = R1 }
+    true -> simplify(R1, R2);
+    false -> simplify(R2, R1)
   end,
   #random_list_weight{
     size = size(R1) + size(R2),
@@ -167,26 +167,15 @@ merge(R1 = #random_list_weight{ items = #rl_pair{ left = Left1, right = Right1 }
   #random_list_weight{
     size = size(R1) + size(R2),
     sum_weight = sum_weight(R1) + sum_weight(R2),
-    items = #rl_pair{
-      left = merge(Left1, Left2),
-      right = merge(Right1, Right2)
-    },
+    items = simplify(merge(Left1, Left2),merge(Right1, Right2)),
     is_balanced = false
   };
 
 merge(R1 = #random_list_weight{ items = #rl_pair{ left = Left1, right = Right1 } }, R2 = #random_list_weight{ items = _List2 }) ->
   D = sum_weight(R2),
   NewItems = case sum_weight(Left1) + D =< sum_weight(Right1) of
-    true ->
-      #rl_pair{
-        left = merge(Left1, R2),
-        right = Right1
-      };
-    false ->
-      #rl_pair{
-        left = Left1,
-        right = merge(Right1, R2)
-      }
+    true -> simplify(merge(Left1, R2), Right1);
+    false -> simplify(Left1, merge(Right1, R2))
   end,
   #random_list_weight{
     size = size(R1) + size(R2),
@@ -251,7 +240,7 @@ filter(Fun, #random_list_weight{ items = List }) when is_list(List) ->
 filter(Fun, #random_list_weight{ items = #rl_pair{ left = Left, right = Right } }) ->
   NewLeft = filter(Fun, Left),
   NewRight = filter(Fun, Right),
-  new(NewLeft ++ NewRight).
+  merge(NewLeft, NewRight).
 
 fold(Fun, Acc, List) ->
   case is_empty(List) of
@@ -266,6 +255,17 @@ foreach(Fun, List) ->
     Fun(Item),
     ok
   end, ok, List).
+
+partition(Fun, #random_list_weight{ items = List }) when is_list(List) ->
+  {Satisfying, NotSatisfying} = lists:partition(fun(#item{ weight = Weight, element = El }) ->
+    Fun({Weight, El})
+  end, List),
+  {new(Satisfying), new(NotSatisfying)};
+
+partition(Fun, #random_list_weight{ items = #rl_pair{ left = Left, right = Right } }) ->
+  {SatisfyingLeft, NotSatisfyingLeft} = filter(Fun, Left),
+  {SatisfyingRight, NotSatisfyingRight} = filter(Fun, Right),
+  { merge(SatisfyingLeft, SatisfyingRight), merge(NotSatisfyingLeft, NotSatisfyingRight) }.
 
 %% Internal
 
@@ -383,6 +383,15 @@ t3_test() ->
   { changed, NewR } = random_list_weight:remove(R, a),
   ?assert(is_empty(NewR)),
   { not_found, R} = remove(R, b),
+  ok.
+
+partition_test() ->
+  L = [1,2,3,4,5,6,7,8,9,0],
+  R = new([{1, X } || X <- L]),
+  { R1, R0 } = partition(fun({_, X}) -> X rem 2 =:= 0 end, R),
+  { L1, L0 } = lists:partition(fun(X) -> X rem 2 =:= 0 end, L),
+  ?assertEqual(lists:sort([{ 1, X } || X <- L1]), lists:sort(to_list(R1))),
+  ?assertEqual(lists:sort([{ 1, X } || X <- L0]), lists:sort(to_list(R0))),
   ok.
 
 -endif.

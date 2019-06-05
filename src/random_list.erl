@@ -7,18 +7,12 @@
 -export([
   new/0, new/1, new/2,
   size/1, is_empty/1,
-  push/2,
+  push/2, merge/2,
   pop/1, get/1, pop_push/1, remove/2,
   to_list/1,
   fold/3, foreach/2, shuffle/1,
-  map/2, filter/2
+  map/2, filter/2, partition/2
 ]).
-
--ifdef(TEST).
-%%  -export([
-%%    t0_test/0,t1_test/0,t2_test/0,t3_test/0,t4_test/0,t5_test/0
-%%  ]).
--endif.
 
 
 -define(MINIMAL_LIST, 5). %% Not separated minimal list
@@ -106,6 +100,45 @@ to_list(#random_list{ items = #rl_pair{ left = Left, right = Right } }) ->
     true -> to_list(Right) ++ to_list(Left)
   end.
 
+merge(R1 = #random_list{ items = List1, size = Size1 }, R2 = #random_list{ items = List2, size = _Size2 }) when is_list(List1), is_list(List2), Size1 < ?MINIMAL_LIST ->
+  #random_list{
+    size = size(R1) + size(R2),
+    items = List1 ++ List2
+  };
+
+merge(R1 = #random_list{ items = List1, size = Size1 }, R2 = #random_list{ items = List2, size = Size2 }) when is_list(List1), is_list(List2), Size2 < ?MINIMAL_LIST, Size1 >= ?MINIMAL_LIST ->
+  merge(R2, R1);
+
+merge(R1 = #random_list{ items = List1 }, R2 = #random_list{ items = List2 }) when is_list(List1), is_list(List2) ->
+  Items = case size(R1) > size(R2) of
+    true -> simplify(R1, R2);
+    false -> simplify(R2, R1)
+  end,
+  #random_list{
+    size = size(R1) + size(R2),
+    items = Items
+  };
+
+merge(R1 = #random_list{ items = #rl_pair{ left = Left1, right = Right1 } }, R2 = #random_list{ items = #rl_pair{ left = Left2, right = Right2 }}) ->
+  #random_list{
+    size = size(R1) + size(R2),
+    items = simplify(merge(Left1, Left2),merge(Right1, Right2))
+  };
+
+merge(R1 = #random_list{ items = #rl_pair{ left = Left1, right = Right1 } }, R2 = #random_list{ items = _List2 }) ->
+  D = size(R2),
+  NewItems = case size(Left1) + D =< size(Right1) of
+    true -> simplify(merge(Left1, R2), Right1);
+    false -> simplify(Left1, merge(Right1, R2))
+  end,
+  #random_list{
+    size = size(R1) + size(R2),
+    items = NewItems
+  };
+
+merge(R1 = #random_list{ items = List1 }, R2 = #random_list{ items = #rl_pair{} }) when is_list(List1) ->
+  merge(R2, R1).
+
 %% High order functions
 
 map(Fun, RandomList = #random_list{ items = List }) when is_list(List) ->
@@ -173,6 +206,15 @@ foreach(Fun, List) ->
     ok
   end, ok, List).
 
+partition(Fun, #random_list{ items = List }) when is_list(List) ->
+  {Satisfying, NotSatisfying} = lists:partition(Fun, List),
+  {new(Satisfying), new(NotSatisfying)};
+
+partition(Fun, #random_list{ items = #rl_pair{ left = Left, right = Right } }) ->
+  {SatisfyingLeft, NotSatisfyingLeft} = filter(Fun, Left),
+  {SatisfyingRight, NotSatisfyingRight} = filter(Fun, Right),
+  { merge(SatisfyingLeft, SatisfyingRight), merge(NotSatisfyingLeft, NotSatisfyingRight) }.
+
 shuffle(List) ->
   fold(fun(Item, Acc) -> [ Item | Acc ] end, [], List).
 
@@ -206,7 +248,6 @@ remove(R = #random_list{ items = #rl_pair{ left = Left, right = Right}}, Element
       { changed, NewR };
     not_found -> { not_found, R }
   end.
-
 
 %% Internal
 
@@ -339,7 +380,7 @@ t4_test() ->
   ?assertEqual(lists:sort(random_list:to_list(R)), lists:sort(random_list:to_list(R0))),
   ok.
 
-t5_test() ->
+filter_test() ->
   List = [ 1,2,3,4,5,6,7,8,9 ],
   Rule = fun(A) -> A rem 2 =:= 0 end,
   L0 = lists:filter(Rule, List),
@@ -349,17 +390,27 @@ t5_test() ->
   ?assertEqual([], L1 -- L0),
   ok.
 
-t6_test() ->
+empty_list_test() ->
   EmptyList = random_list:new(),
   ?assertEqual({ error, list_is_empty }, random_list:pop(EmptyList)),
   ?assertEqual({ error, list_is_empty }, random_list:get(EmptyList)),
   ok.
 
-t7_test() ->
+remove_test() ->
   R = random_list:new([a]),
   { changed, NewR } = random_list:remove(R, a),
   ?assert(is_empty(NewR)),
   { not_found, R} = remove(R, b),
+  ok.
+
+partition_test() ->
+  L = [1,2,3,4,5,6,7,8,9,0],
+  R = new(L),
+  F = fun(X) -> X rem 2 =:= 0 end,
+  { R1, R0 } = partition(F, R),
+  { L1, L0 } = lists:partition(F, L),
+  ?assertEqual(lists:sort(L1), lists:sort(to_list(R1))),
+  ?assertEqual(lists:sort(L0), lists:sort(to_list(R0))),
   ok.
 
 -endif.
