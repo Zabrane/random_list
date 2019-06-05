@@ -1,4 +1,5 @@
 -module(random_list).
+-author("Sergey Loguntsov <loguntsov@gmail.com>").
 
 -compile({no_auto_import, [ size/1, get/1 ]}).
 
@@ -7,7 +8,7 @@
   new/0, new/1, new/2,
   size/1, is_empty/1,
   push/2,
-  pop/1, get/1, pop_push/1,
+  pop/1, get/1, pop_push/1, remove/2,
   to_list/1,
   fold/3, foreach/2, shuffle/1,
   map/2, filter/2
@@ -175,6 +176,38 @@ foreach(Fun, List) ->
 shuffle(List) ->
   fold(fun(Item, Acc) -> [ Item | Acc ] end, [], List).
 
+remove(R = #random_list{ items = List }, Element) when is_list(List) ->
+  R0 = lists:search(fun(V) -> Element =:= V end, List),
+  case R0 of
+    false -> { not_found, R};
+    { value, Item} ->
+      NewR = R#random_list{
+        items = List -- [Item],
+        size = size(R) - 1
+      },
+      { changed, NewR }
+  end;
+
+remove(R = #random_list{ items = #rl_pair{ left = Left, right = Right}}, Element) ->
+  Result = case remove(Left, Element) of
+    { changed, NLeft} -> { changed, NLeft, Right };
+    { not_found, _ } ->
+      case remove(Right, Element) of
+        { changed, NRight} -> { changed, Left, NRight};
+        { not_found, _ } ->  not_found
+      end
+  end,
+  case Result of
+    { changed, NewLeft, NewRight } ->
+      NewR = R#random_list{
+        items = simplify(NewLeft, NewRight),
+        size = size(R) - 1
+      },
+      { changed, NewR };
+    not_found -> { not_found, R }
+  end.
+
+
 %% Internal
 
 pop(Position, #random_list{ size = Size }) when Position > Size -> { error, bad_position };
@@ -320,6 +353,13 @@ t6_test() ->
   EmptyList = random_list:new(),
   ?assertEqual({ error, list_is_empty }, random_list:pop(EmptyList)),
   ?assertEqual({ error, list_is_empty }, random_list:get(EmptyList)),
+  ok.
+
+t7_test() ->
+  R = random_list:new([a]),
+  { changed, NewR } = random_list:remove(R, a),
+  ?assert(is_empty(NewR)),
+  { not_found, R} = remove(R, b),
   ok.
 
 -endif.

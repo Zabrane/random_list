@@ -1,5 +1,5 @@
-
 -module(random_list_weight).
+-author("Sergey Loguntsov <loguntsov@gmail.com>").
 
 -compile({no_auto_import, [ size/1, get/1 ]}).
 
@@ -7,7 +7,7 @@
 -export([
   new/0, new/1,
   size/1, is_empty/1, propability/2,
-  push/3, merge/2,
+  push/3, merge/2, remove/2,
   pop/1, get/1, pop_push/1,
   balance/1,
   to_list/1,
@@ -74,10 +74,7 @@ balance(R = #random_list_weight{ items = List }) when is_list(List) ->
 balance(R = #random_list_weight{ items = #rl_pair{left = Left, right = Right}}) ->
 
   R#random_list_weight{
-    items = simplify(#rl_pair{
-      left = balance(Left),
-      right = balance(Right)
-    }),
+    items = simplify(balance(Left), balance(Right)),
     is_balanced = true
   }.
 
@@ -201,6 +198,38 @@ merge(R1 = #random_list_weight{ items = #rl_pair{ left = Left1, right = Right1 }
 merge(R1 = #random_list_weight{ items = List1 }, R2 = #random_list_weight{ items = #rl_pair{} }) when is_list(List1) ->
   merge(R2, R1).
 
+remove(R = #random_list_weight{ items = List }, Element) when is_list(List) ->
+  R0 = lists:search(fun(#item{ element = V}) -> Element =:= V end, List),
+  case R0 of
+    false -> { not_found, R};
+    { value, Item} ->
+      NewR = R#random_list_weight{
+        items = List -- [Item],
+        size = size(R) - 1,
+        sum_weight = sum_weight(R) - Item#item.weight
+      },
+      { changed, NewR }
+  end;
+
+remove(R = #random_list_weight{ items = #rl_pair{ left = Left, right = Right}}, Element) ->
+  Result = case remove(Left, Element) of
+    { changed, NLeft} -> { changed, NLeft, Right };
+    { not_found, _ } ->
+      case remove(Right, Element) of
+        { changed, NRight} -> { changed, Left, NRight};
+        { not_found, _ } ->  not_found
+      end
+  end,
+  case Result of
+    { changed, NewLeft, NewRight } ->
+      NewR = R#random_list_weight{
+        items = simplify(NewLeft, NewRight),
+        size = size(R) - 1,
+        sum_weight = sum_weight(NewLeft) + sum_weight(NewRight)
+      },
+      { changed, NewR };
+    not_found -> { not_found, R }
+  end.
 
 %% High order functions
 
@@ -296,7 +325,7 @@ extract(WeightPos, #random_list_weight{ items = #rl_pair{ left = Left, right = R
 
 %% INTERNAL
 
-simplify(#rl_pair{ left = Left, right = Right}) ->
+simplify(Left, Right) ->
   LS = size(Left),
   RS = size(Right),
   case { LS, RS } of
@@ -305,6 +334,8 @@ simplify(#rl_pair{ left = Left, right = Right}) ->
     { _ , 0 } -> Left#random_list_weight.items;
     _ -> #rl_pair{ left = Left, right = Right }
   end.
+
+
 
 %% -----------------------------------------------------
 %% TESTS
@@ -345,6 +376,13 @@ t2_test() ->
   EmptyList = random_list_weight:new(),
   ?assertEqual({ error, list_is_empty }, random_list_weight:pop(EmptyList)),
   ?assertEqual({ error, list_is_empty }, random_list_weight:get(EmptyList)),
+  ok.
+
+t3_test() ->
+  R = random_list_weight:new([{1, a}]),
+  { changed, NewR } = random_list_weight:remove(R, a),
+  ?assert(is_empty(NewR)),
+  { not_found, R} = remove(R, b),
   ok.
 
 -endif.
