@@ -265,7 +265,7 @@ pop(Position, List) ->
 
 get(_, #random_list{ size = 0 }) -> {error, list_is_empty };
 get(Number, #random_list{ items = List }) when is_list(List) ->
-  lists:nth(Number, List);
+  {ok, lists:nth(Number, List)};
 get(Number, #random_list{ items = #rl_pair{ left = Left, right = Right } }) ->
   Delta = size(Left) - Number,
   case Delta >= 0 of
@@ -364,7 +364,7 @@ t2_test() ->
 t3_test() ->
   List = [ 1,2,3 ],
   R = random_list:new(List),
-  Res = random_list:get(R),
+  { ok, Res } = random_list:get(R),
   ?assertEqual(true, lists:member(Res, List)),
   ok.
 
